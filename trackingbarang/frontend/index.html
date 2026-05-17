@@ -1,0 +1,374 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Monitoring Tracking Barang</title>
+    <link rel="stylesheet" href="styles.css" />
+    <script src="https://unpkg.com/vue@3/dist/vue.global.prod.js"></script>
+</head>
+<body>
+    <div id="app">
+        <header class="topbar">
+            <div>
+                <h1>Monitoring Tracking Barang</h1>
+                <p>Aplikasi monitoring barang supplier → transit → warehouse utama</p>
+            </div>
+            <div v-if="user" class="user-box">
+                <strong>{{ user.full_name }}</strong>
+                <small>{{ user.role }}</small>
+                <button class="btn danger" @click="logout">Logout</button>
+            </div>
+        </header>
+
+        <main class="container">
+            <section v-if="!user" class="card login-card">
+    <h2>Login</h2>
+    <div class="form-grid one-col">
+        <div>
+            <label>Username</label>
+            <input v-model="loginForm.username" type="text" placeholder="Masukkan username" />
+        </div>
+        <div>
+            <label>Password</label>
+            <input v-model="loginForm.password" type="password" placeholder="Masukkan password" />
+        </div>
+    </div>
+    <button class="btn primary" @click="login">Masuk</button>
+
+    <p v-if="message.text" style="margin-top:12px; color:red; font-weight:600;">
+        {{ message.text }}
+    </p>
+
+                <!--
+                <div class="help-box">
+                    <p><strong>User demo:</strong></p>
+                    <p>admin / 123456</p>
+                    <p>transit1 / 123456</p>
+                    <p>mainwh / 123456</p>
+                </div> -->
+            </section>
+
+            <template v-else>
+                <section class="stats-grid">
+                    <div class="card stat-card"><h3>Total Shipment</h3><p>{{ dashboard.total_shipments || 0 }}</p></div>
+                    <div class="card stat-card"><h3>Manual Pending</h3><p>{{ dashboard.manual_pending || 0 }}</p></div>
+                    <div class="card stat-card"><h3>Received at Transit</h3><p>{{ dashboard.received_transit || 0 }}</p></div>
+                    <div class="card stat-card"><h3>On Delivery Main</h3><p>{{ dashboard.on_delivery_main || 0 }}</p></div>
+                    <div class="card stat-card"><h3>Received at Main</h3><p>{{ dashboard.received_main || 0 }}</p></div>
+                </section>
+
+                <nav class="menu-tabs">
+                    <button class="tab" :class="{active: activeTab === 'shipments'}" @click="activeTab = 'shipments'">Shipment</button>
+                    <button class="tab" :class="{active: activeTab === 'create'}" @click="activeTab = 'create'">Input Shipment</button>
+                    <button class="tab" :class="{active: activeTab === 'monitoring'}" @click="activeTab = 'monitoring'">Monitoring</button>
+                    <button v-if="user.role === 'admin'" class="tab" :class="{active: activeTab === 'verify'}" @click="activeTab = 'verify'">Verifikasi Manual</button>
+                    <button v-if="user.role === 'admin'" class="tab" :class="{active: activeTab === 'master'}" @click="activeTab = 'master'">Master Data</button>
+                </nav>
+
+                <section v-if="message.text" class="alert" :class="message.type">{{ message.text }}</section>
+
+                <section v-if="activeTab === 'shipments'" class="card">
+                    <div class="card-header">
+                        <h2>Daftar Shipment</h2>
+                        <div class="form-grid compact">
+    <div>
+        <label>Cari Shipment</label>
+        <input v-model="shipmentSearch" type="text" placeholder="Cari PO / Supplier / Status"/>
+    </div>
+
+    <div>
+        <label>Filter Status</label>
+        <select v-model="shipmentStatusFilter">
+            <option value="">Semua</option>
+            <option>Received at Transit</option>
+            <option>Dispatched from Transit</option>
+            <option>On Delivery to Main Warehouse</option>
+            <option>Received at Main Warehouse</option>
+            <option>Closed</option>
+        </select>
+    </div>
+</div>
+                        <button class="btn secondary" @click="loadShipments">Refresh</button>
+                    </div>
+                    <div class="table-wrap">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>ID</th>
+                                    <th>PO</th>
+                                    <th>Supplier</th>
+                                    <th>Tujuan</th>
+                                    <th>Tanggal</th>
+                                    <th>Status</th>
+                                    <th>Aksi</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr v-for="row in filteredShipments" :key="row.shipment_id">
+                                    <td>{{ row.shipment_id }}</td>
+                                    <td>{{ row.po_number }}</td>
+                                    <td>{{ row.supplier_name }}</td>
+                                    <td>{{ row.destination_warehouse }}</td>
+                                    <td>{{ row.shipment_date }}</td>
+                                    <td>{{ row.current_status }}</td>
+                                    <td>
+                                        <button class="btn small" @click="viewShipment(row.shipment_id)">Detail</button>
+                                    </td>
+                                </tr>
+                                <tr v-if="filteredShipments.length === 0">
+                                    <td colspan="7" class="empty">Belum ada shipment.</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </section>
+
+                <section v-if="activeTab === 'create'" class="card">
+                    <div class="card-header">
+                        <h2>Input Shipment</h2>
+                        <button class="btn secondary" @click="resetShipmentForm">Reset</button>
+                    </div>
+                    <div class="form-grid">
+                        <div>
+                            <label>Nomor PO</label>
+                            <input v-model="shipmentForm.po_number" type="text" />
+                        </div>
+                        <div>
+                            <label>Nomor Surat Jalan</label>
+                            <input v-model="shipmentForm.delivery_note_number" type="text" />
+                        </div>
+                        <div>
+                            <label>Supplier</label>
+                            <select v-model="shipmentForm.supplier_id">
+                                <option value="">Pilih supplier</option>
+                                <option v-for="s in suppliers" :key="s.supplier_id" :value="Number(s.supplier_id)">{{ s.supplier_name }}</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label>Tujuan Warehouse</label>
+                            <select v-model="shipmentForm.destination_warehouse_id">
+                                <option value="">Pilih warehouse</option>
+                                <option v-for="w in warehouses" :key="w.warehouse_id" :value="Number(w.warehouse_id)">{{ w.warehouse_name }}</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label>Tanggal Shipment</label>
+                            <input v-model="shipmentForm.shipment_date" type="date" />
+                        </div>
+                        <div>
+                            <label>Status Awal</label>
+                            <select v-model="shipmentForm.current_status">
+                                <option>Received at Transit</option>
+                                <option>On Delivery to Main Warehouse</option>
+                                <option>Received at Main Warehouse</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <h3>Detail Barang</h3>
+                    <div v-for="(detail, index) in shipmentForm.details" :key="index" class="detail-box">
+                        <div class="form-grid">
+                            <div>
+                                <label>Tipe Input</label>
+                                <select v-model="detail.item_input_type">
+                                    <option value="master">Barang Master</option>
+                                    <option value="manual">Barang Manual</option>
+                                </select>
+                            </div>
+                            <div v-if="detail.item_input_type === 'master'">
+                                <label>Pilih Barang</label>
+                                <select v-model="detail.item_id">
+                                    <option value="">Pilih barang</option>
+                                    <option v-for="item in items" :key="item.item_id" :value="Number(item.item_id)">
+                                        {{ item.item_code }} - {{ item.item_name }}
+                                    </option>
+                                </select>
+                            </div>
+                            <template v-else>
+                                <div>
+                                    <label>Nama Barang Manual</label>
+                                    <input v-model="detail.manual_item_name" type="text" placeholder="Contoh: Pipa hitam 2 meter" />
+                                </div>
+                                <div>
+                                    <label>Deskripsi Manual</label>
+                                    <input v-model="detail.manual_description" type="text" placeholder="Deskripsi fisik barang" />
+                                </div>
+                            </template>
+                            <div>
+                                <label>Qty</label>
+                                <input v-model.number="detail.qty" type="number" min="1" />
+                            </div>
+                            <div>
+                                <label>Satuan</label>
+                                <input v-model="detail.unit" type="text" placeholder="Box / Batang / Unit" />
+                            </div>
+                            <div class="full-width">
+                                <label>Catatan</label>
+                                <input v-model="detail.note" type="text" placeholder="Catatan tambahan" />
+                            </div>
+                        </div>
+                        <button class="btn danger small" @click="removeDetail(index)" v-if="shipmentForm.details.length > 1">Hapus Detail</button>
+                    </div>
+                    <div class="inline-actions">
+                        <button class="btn secondary" @click="addDetail">+ Tambah Detail</button>
+                        <button class="btn primary" @click="saveShipment">Simpan Shipment</button>
+                    </div>
+                </section>
+
+                <section v-if="activeTab === 'monitoring'" class="card">
+                    <div class="card-header">
+                        <h2>Monitoring & Update Status</h2>
+                    </div>
+                    <div class="form-grid three-col compact">
+                        <div>
+                            <label>Pilih Shipment</label>
+                            <select v-model="statusForm.shipment_id">
+                                <option value="">Pilih shipment</option>
+                                <option v-for="s in shipments" :key="s.shipment_id" :value="Number(s.shipment_id)">
+                                    #{{ s.shipment_id }} - {{ s.po_number }} - {{ s.current_status }}
+                                </option>
+                            </select>
+                        </div>
+                        <div>
+                            <label>Warehouse Update</label>
+                            <select v-model="statusForm.warehouse_id">
+                                <option value="">Pilih warehouse</option>
+                                <option v-for="w in warehouses" :key="w.warehouse_id" :value="Number(w.warehouse_id)">{{ w.warehouse_name }}</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label>Status Baru</label>
+                            <select v-model="statusForm.tracking_status">
+                                <option>Received at Transit</option>
+                                <option>Dispatched from Transit</option>
+                                <option>On Delivery to Main Warehouse</option>
+                                <option>Received at Main Warehouse</option>
+                                <option>Closed</option>
+                            </select>
+                        </div>
+                        <div class="full-width">
+                            <label>Catatan</label>
+                            <input v-model="statusForm.note" type="text" placeholder="Masukkan catatan update status" />
+                        </div>
+                    </div>
+                    <div class="inline-actions">
+                        <button class="btn primary" @click="updateStatus">Update Status</button>
+                    </div>
+
+                    <div v-if="selectedShipment" class="detail-panel">
+                        <h3>Detail Shipment #{{ selectedShipment.shipment.shipment_id }}</h3>
+                        <p><strong>PO:</strong> {{ selectedShipment.shipment.po_number }}</p>
+                        <p><strong>Supplier:</strong> {{ selectedShipment.shipment.supplier_name }}</p>
+                        <p><strong>Status:</strong> {{ selectedShipment.shipment.current_status }}</p>
+
+                        <h4>Detail Barang</h4>
+                        <ul>
+                            <li v-for="d in selectedShipment.details" :key="d.detail_id">
+                                {{ d.item_name || d.manual_item_name }} - {{ d.qty }} {{ d.unit }}
+                                <span v-if="d.item_input_type === 'manual'">(Manual - {{ d.verification_status }})</span>
+                            </li>
+                        </ul>
+
+                        <h4>Riwayat Tracking</h4>
+                        <ul class="timeline">
+                            <li v-for="t in selectedShipment.tracking" :key="t.tracking_id">
+                                <strong>{{ t.tracking_status }}</strong> - {{ t.warehouse_name }}
+                                <br />
+                                <small>{{ t.update_time }} | {{ t.updated_by_name }} | {{ t.note }}</small>
+                            </li>
+                        </ul>
+                    </div>
+                </section>
+
+                <section v-if="activeTab === 'verify'" class="card">
+                    <div class="card-header">
+                        <h2>Verifikasi Barang Manual</h2>
+                    </div>
+                    <div class="table-wrap">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>Detail ID</th>
+                                    <th>PO</th>
+                                    <th>Supplier</th>
+                                    <th>Nama Manual</th>
+                                    <th>Qty</th>
+                                    <th>Status</th>
+                                    <th>Verifikasi</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr v-for="row in manualItems" :key="row.detail_id">
+                                    <td>{{ row.detail_id }}</td>
+                                    <td>{{ row.po_number }}</td>
+                                    <td>{{ row.supplier_name }}</td>
+                                    <td>{{ row.manual_item_name }}</td>
+                                    <td>{{ row.qty }} {{ row.unit }}</td>
+                                    <td>{{ row.verification_status }}</td>
+                                    <td>
+                                        <div class="verify-box">
+                                            <select v-model="verificationMap[row.detail_id]">
+                                                <option value="">Pilih item master</option>
+                                                <option v-for="item in items" :key="item.item_id" :value="Number(item.item_id)">
+                                                    {{ item.item_code }} - {{ item.item_name }}
+                                                </option>
+                                            </select>
+                                            <button class="btn small primary" @click="verifyManual(row.detail_id)">Verify</button>
+                                        </div>
+                                    </td>
+                                </tr>
+                                <tr v-if="manualItems.length === 0">
+                                    <td colspan="7" class="empty">Tidak ada barang manual.</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </section>
+
+                <section v-if="activeTab === 'master'" class="grid-2">
+                    <div class="card">
+                        <h2>Tambah Supplier</h2>
+                        <div class="form-grid one-col">
+                            <div>
+                                <label>Nama Supplier</label>
+                                <input v-model="supplierForm.supplier_name" type="text" />
+                            </div>
+                            <div>
+                                <label>Alamat</label>
+                                <input v-model="supplierForm.address" type="text" />
+                            </div>
+                            <button class="btn primary" @click="saveSupplier">Simpan Supplier</button>
+                        </div>
+                    </div>
+
+                    <div class="card">
+                        <h2>Tambah Master Barang</h2>
+                        <div class="form-grid one-col">
+                            <div>
+                                <label>Kode Barang</label>
+                                <input v-model="itemForm.item_code" type="text" />
+                            </div>
+                            <div>
+                                <label>Nama Barang</label>
+                                <input v-model="itemForm.item_name" type="text" />
+                            </div>
+                            <div>
+                                <label>Satuan</label>
+                                <input v-model="itemForm.unit" type="text" />
+                            </div>
+                            <div>
+                                <label>Deskripsi</label>
+                                <input v-model="itemForm.description" type="text" />
+                            </div>
+                            <button class="btn primary" @click="saveItem">Simpan Barang</button>
+                        </div>
+                    </div>
+                </section>
+            </template>
+        </main>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>
