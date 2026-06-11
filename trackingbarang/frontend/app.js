@@ -3,7 +3,7 @@ const { createApp } = Vue;
 createApp({
     data() {
         return {
-            apiBase: 'https://salad-strongman-sullen.ngrok-free.dev/trackingapp_tes/backend/index.php',
+            apiBase: 'https://trackingshipment.org/backend/index.php', //'https://salad-strongman-sullen.ngrok-free.dev/trackingapp_tes/backend/index.php',
             user: null,
             activeTab: 'shipments',
             message: { text: '', type: 'success' },
@@ -255,19 +255,23 @@ computed: {
             }
         },
 
-        async viewShipment(id) {
-            try {
-                const res = await this.apiRequest('shipment-detail', {
-                    query: `shipment_id=${id}`
-                });
+async viewShipment(id) {
+    try {
+        const res = await this.apiRequest('shipment-detail', {
+            query: `shipment_id=${id}`
+        });
 
-                this.selectedShipment = res.data;
-                this.activeTab = 'monitoring';
-                this.statusForm.shipment_id = id;
-            } catch (error) {
-                this.setMessage(error.message, 'error');
-            }
-        },
+        this.selectedShipment = res.data;
+
+        console.log("DATA SHIPMENT:");
+        console.log(this.selectedShipment);
+
+        this.activeTab = 'monitoring';
+        this.statusForm.shipment_id = id;
+    } catch (error) {
+        this.setMessage(error.message, 'error');
+    }
+},
 
         async updateStatus() {
             try {
@@ -344,6 +348,189 @@ computed: {
             } catch (error) {
                 this.setMessage(error.message, 'error');
             }
-        }
+        },
+      exportPDF() {
+
+    if (!this.selectedShipment) {
+        alert("Pilih shipment terlebih dahulu");
+        return;
     }
+
+    const { jsPDF } = window.jspdf;
+    const doc = new jsPDF();
+
+    const shipment = this.selectedShipment.shipment;
+    const details = this.selectedShipment.details;
+    const tracking = this.selectedShipment.tracking;
+
+let y = 20;
+
+// Judul
+doc.setFontSize(18);
+doc.setFont(undefined, "bold");
+doc.text("MONITORING TRACKING BARANG", 20, y);
+
+// Garis bawah judul
+y += 5;
+doc.line(20, y, 190, y);
+
+y += 12;
+
+// Kembalikan font normal
+doc.setFont(undefined, "normal");
+
+doc.rect(15, y - 5, 180, 35);
+
+doc.setFontSize(11);
+
+doc.text(`PO Number : ${shipment.po_number || '-'}`, 20, y);
+y += 8;
+
+doc.text(`Supplier : ${shipment.supplier_name || '-'}`, 20, y);
+y += 8;
+
+doc.text(`Status : ${shipment.current_status || shipment.status || '-'}`, 20, y);
+y += 8;
+
+doc.text(`Tanggal : ${shipment.shipment_date || '-'}`, 20, y);
+
+    y += 15;
+
+doc.setFontSize(14);
+doc.setFont(undefined, "bold");
+doc.text("DETAIL BARANG", 20, y);
+doc.setFont(undefined, "normal");
+
+    y += 10;
+
+doc.setFontSize(11);
+
+// Header tabel
+doc.line(20, y, 190, y);
+y += 7;
+
+doc.text("No", 25, y);
+doc.text("Nama Barang", 40, y);
+doc.text("Qty", 140, y);
+doc.text("Unit", 165, y);
+
+y += 4;
+doc.line(20, y, 190, y);
+
+let no = 1;
+
+details.forEach(item => {
+
+    y += 8;
+
+    doc.text(String(no), 25, y);
+
+    doc.text(
+        item.item_name || '-',
+        40,
+        y
+    );
+
+    doc.text(
+        String(item.qty || 0),
+        140,
+        y
+    );
+
+    doc.text(
+        item.unit || '-',
+        165,
+        y
+    );
+
+    no++;
+});
+
+y += 5;
+doc.line(20, y, 190, y);
+
+    y += 10;
+
+    doc.setFontSize(13);
+    doc.text("RIWAYAT TRACKING", 20, y);
+
+    y += 10;
+
+    doc.setFontSize(11);
+
+let nomorTracking = 1;
+
+tracking.forEach(row => {
+
+    doc.setFont(undefined, "bold");
+    doc.text(
+        `${nomorTracking}. ${row.tracking_status}`,
+        25,
+        y
+    );
+
+    doc.setFont(undefined, "normal");
+
+    y += 8;
+
+    doc.text(
+        `Warehouse : ${row.warehouse_name || '-'}`,
+        35,
+        y
+    );
+
+    y += 6;
+
+    doc.text(
+        `Waktu : ${row.update_time || '-'}`,
+        35,
+        y
+    );
+
+    y += 6;
+
+    doc.text(
+        `Petugas : ${row.updated_by_name || '-'}`,
+        35,
+        y
+    );
+
+    y += 6;
+
+    if (row.note) {
+
+        doc.text(
+            `Catatan : ${row.note}`,
+            35,
+            y
+        );
+
+        y += 6;
+    }
+
+    y += 4;
+
+    doc.line(30, y, 180, y);
+
+    y += 8;
+
+    nomorTracking++;
+});
+y += 10;
+
+doc.line(20, y, 190, y);
+
+y += 8;
+
+doc.setFontSize(9);
+
+doc.text(
+    `Dicetak pada : ${new Date().toLocaleString('id-ID')}`,
+    20,
+    y
+);
+
+    doc.save(`Shipment_${shipment.po_number}.pdf`);
+}
+}
 }).mount('#app');
