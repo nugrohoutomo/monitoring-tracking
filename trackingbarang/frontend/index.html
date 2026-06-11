@@ -6,6 +6,7 @@
     <title>Monitoring Tracking Barang</title>
     <link rel="stylesheet" href="styles.css" />
     <script src="https://unpkg.com/vue@3/dist/vue.global.prod.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 </head>
 <body>
     <div id="app">
@@ -257,7 +258,16 @@
                     </div>
 
                     <div v-if="selectedShipment" class="detail-panel">
-                        <h3>Detail Shipment #{{ selectedShipment.shipment.shipment_id }}</h3>
+                        <div style="display:flex;justify-content:space-between;align-items:center;">
+    <h3>Detail Shipment #{{ selectedShipment.shipment.shipment_id }}</h3>
+
+    <button
+        class="btn primary"
+        @click="exportPDF"
+    >
+        📄 Export PDF
+    </button>
+</div>
                         <p><strong>PO:</strong> {{ selectedShipment.shipment.po_number }}</p>
                         <p><strong>Supplier:</strong> {{ selectedShipment.shipment.supplier_name }}</p>
                         <p><strong>Status:</strong> {{ selectedShipment.shipment.current_status }}</p>
@@ -369,6 +379,6 @@
         </main>
     </div>
 
-    <script src="app.js"></script>
+    <script src="app.js?v=2"></script>
 </body>
 </html>
